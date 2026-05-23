@@ -1,0 +1,131 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  - job_name: 'mountainconnect-api'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - mountainconnect
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_tier]
+        action: keep
+        regex: api
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    metrics_path: '/metrics'
+    scheme: http
+    scrape_interval: 15s
+
+  - job_name: 'mountainconnect-worker'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - mountainconnect
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_tier]
+        action: keep
+        regex: worker
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  - job_name: 'redis'
+    static_configs:
+      - targets:
+          - 'mountainconnect-staging-redis.xxxxxxxx.ap-southeast-1.elasticache.amazonaws.com:9121'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+# Alert Rules
+groups:
+  - name: mountainconnect-alerts
+    rules:
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="mountainconnect-api"}[5m])) by (le, path)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency on {{ $labels.path }}"
+          description: "P95 latency is {{ $value }}s on {{ $labels.path }}"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Error rate > 1%"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: ServiceDown
+        expr: up{job="mountainconnect-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API service is down"
+          description: "API pod is not reachable for 1 minute"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
+
+      - alert: QueueDepthSpike
+        expr: bullmq_waiting_count > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "BullMQ queue depth spike"
+          description: "Queue depth is {{ $value }}"
+
+      - alert: DBConnectionsHigh
+        expr: pg_stat_activity_count{datname="mountainconnect"} > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections"
+          description: "DB connections: {{ $value }}"
