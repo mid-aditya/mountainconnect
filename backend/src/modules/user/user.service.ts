@@ -31,8 +31,24 @@ export class UserService {
     return this.userRepository.findOne({ where: { email } });
   }
 
+  async findByEmailWithPassword(email: string): Promise<User | null> {
+    return this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.password")
+      .where("user.email = :email", { email })
+      .getOne();
+  }
+
   async findByPhone(phone: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { phone } });
+  }
+
+  async findByPhoneWithPassword(phone: string): Promise<User | null> {
+    return this.userRepository
+      .createQueryBuilder("user")
+      .addSelect("user.password")
+      .where("user.phone = :phone", { phone })
+      .getOne();
   }
 
   async findAll(

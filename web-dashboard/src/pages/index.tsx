@@ -63,7 +63,9 @@ export default function LandingPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password");
+      setError(
+        "Login gagal. Pastikan backend berjalan di http://localhost:4000, lalu gunakan admin@mountainconnect.id / Admin123!",
+      );
       setLoading(false);
     } else {
       router.push("/dashboard");
@@ -105,8 +107,11 @@ export default function LandingPage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 Welcome Back
               </h1>
-              <p className="text-gray-500 mb-8">
+              <p className="text-gray-500 mb-2">
                 Sign in to your admin dashboard
+              </p>
+              <p className="text-xs text-gray-400 mb-8">
+                Dev: admin@mountainconnect.id / Admin123! (dibuat otomatis saat backend start)
               </p>
 
               {error && (

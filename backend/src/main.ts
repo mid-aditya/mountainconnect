@@ -2,6 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+import { seedDefaultAdmin } from "./bootstrap/seed-admin";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -34,6 +35,15 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
+
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      await seedDefaultAdmin(app);
+    } catch (err) {
+      console.warn("Admin seed skipped:", err);
+    }
+  }
+
   console.log(`MountainConnect API running on http://localhost:${port}/api/v1`);
   console.log(`Swagger docs at http://localhost:${port}/api/docs`);
 }

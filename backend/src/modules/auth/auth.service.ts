@@ -61,8 +61,9 @@ export class AuthService {
       roles: ["solo_traveler"],
     });
     const tokens = await this.generateTokens(savedUser);
+    const { password: _password, ...safeUser } = savedUser;
 
-    return { user: savedUser, tokens };
+    return { user: safeUser as User, tokens };
   }
 
   async login(
@@ -73,10 +74,10 @@ export class AuthService {
   }> {
     const { emailOrPhone, password } = loginDto;
 
-    // Find user by email or phone
-    let user = await this.userService.findByEmail(emailOrPhone);
+    // Find user by email or phone (include password hash for verification)
+    let user = await this.userService.findByEmailWithPassword(emailOrPhone);
     if (!user) {
-      user = await this.userService.findByPhone(emailOrPhone);
+      user = await this.userService.findByPhoneWithPassword(emailOrPhone);
     }
 
     if (!user) {
@@ -103,8 +104,9 @@ export class AuthService {
     await this.userService.updateLastLogin(user.id);
 
     const tokens = await this.generateTokens(user);
+    const { password: _password, ...safeUser } = user;
 
-    return { user, tokens };
+    return { user: safeUser as User, tokens };
   }
 
   async socialLogin(

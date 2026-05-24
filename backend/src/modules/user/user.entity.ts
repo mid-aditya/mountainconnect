@@ -32,11 +32,9 @@ export interface Badge {
 
 @Entity('users')
 export class User extends BaseEntity {
-  @Index()
   @Column({ unique: true, nullable: true })
   email: string;
 
-  @Index()
   @Column({ unique: true, nullable: true })
   phone: string;
 
@@ -77,11 +75,7 @@ export class User extends BaseEntity {
   @Column({ name: 'guide_certified', default: false })
   guideCertified: boolean;
 
-  @Column({ name: 'is_active', default: true })
-  @Index()
-  isActive: boolean;
-
-  @Column({ name: 'last_login', type: 'timestamp with time zone', nullable: true })
+  @Column({ name: 'last_login', type: 'datetime', nullable: true })
   lastLogin: Date | null;
 
   @Column({ type: 'json', nullable: true })

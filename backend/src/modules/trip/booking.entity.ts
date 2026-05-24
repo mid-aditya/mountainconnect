@@ -55,10 +55,10 @@ export class Booking extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   specialRequests: string;
 
-  @Column({ name: 'check_in_time', type: 'timestamp with time zone', nullable: true })
+  @Column({ name: 'check_in_time', type: 'datetime', nullable: true })
   checkInTime: Date;
 
-  @Column({ name: 'check_out_time', type: 'timestamp with time zone', nullable: true })
+  @Column({ name: 'check_out_time', type: 'datetime', nullable: true })
   checkOutTime: Date;
 
   @Column({ name: 'is_late_checkout', default: false })

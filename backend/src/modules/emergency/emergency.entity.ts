@@ -40,7 +40,7 @@ export class SOSEvent extends BaseEntity {
   @Column({ type: 'enum', enum: SOSStatus, default: SOSStatus.ACTIVE })
   status: SOSStatus;
 
-  @Column({ name: 'resolved_at', type: 'timestamp with time zone', nullable: true })
+  @Column({ name: 'resolved_at', type: 'datetime', nullable: true })
   resolvedAt: Date;
 
   @Column({ type: 'json', nullable: true })

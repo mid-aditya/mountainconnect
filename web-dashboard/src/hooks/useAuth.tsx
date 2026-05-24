@@ -9,8 +9,10 @@ interface AuthUser {
   email: string;
   name: string;
   image?: string;
-  role: UserRole;
-  permissions: string[];
+  role?: UserRole;
+  roles?: string[];
+  permissions?: string[];
+  accessToken?: string;
 }
 
 export function useAuth() {
@@ -40,20 +42,27 @@ export function useAuth() {
     router.push('/');
   };
 
+  const userRoles = (): string[] => {
+    if (!user) return [];
+    if (user.roles?.length) return user.roles;
+    if (user.role) return [user.role];
+    return [];
+  };
+
   const hasRole = (...roles: UserRole[]): boolean => {
-    if (!user) return false;
-    return roles.includes(user.role);
+    const current = userRoles();
+    return roles.some((r) => current.includes(r));
   };
 
   const hasPermission = (...permissions: string[]): boolean => {
-    if (!user) return false;
-    return permissions.some((p) => user.permissions.includes(p));
+    if (!user?.permissions?.length) return false;
+    return permissions.some((p) => user.permissions!.includes(p));
   };
 
-  const isAdmin = (): boolean => user?.role === 'admin';
-  const isOperator = (): boolean => user?.role === 'operator';
-  const isTnAdmin = (): boolean => user?.role === 'tn_admin';
-  const isModerator = (): boolean => user?.role === 'moderator';
+  const isAdmin = (): boolean => userRoles().includes('admin');
+  const isOperator = (): boolean => userRoles().includes('operator');
+  const isTnAdmin = (): boolean => userRoles().includes('tn_admin');
+  const isModerator = (): boolean => userRoles().includes('moderator');
 
   return {
     user,

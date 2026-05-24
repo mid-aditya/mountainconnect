@@ -37,12 +37,12 @@ export class Notification {
   @Column({ name: "is_read", default: false })
   isRead: boolean;
 
-  @Column({ name: "read_at", type: "timestamp with time zone", nullable: true })
+  @Column({ name: "read_at", type: "datetime", nullable: true })
   readAt: Date;
 
-  @CreateDateColumn({ name: "created_at", type: "timestamp with time zone" })
+  @CreateDateColumn({ name: "created_at", type: "datetime" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: "updated_at", type: "timestamp with time zone" })
+  @UpdateDateColumn({ name: "updated_at", type: "datetime" })
   updatedAt: Date;
 }
