@@ -29,7 +29,6 @@ mountainconnect-app/
 │   │   ├── workers/   # BullMQ background jobs (checkout alert, weather polling, offline sync)
 │   │   ├── common/    # Guards, decorators, filters, interceptors
 │   │   └── config/    # Database, app, environment configs
-│   └── Dockerfile
 │
 ├── mobile/            # React Native app (iOS/Android)
 │   ├── src/
@@ -47,10 +46,9 @@ mountainconnect-app/
 │   ├── tn-admin-portal/  # Taman Nasional admin dashboard
 │   └── moderation-tools/  # Content moderation tools
 │
-├── infra/             # Infrastructure as Code
-│   ├── terraform/     # AWS ECS, RDS, Redis, S3, CloudFront, Route53
-│   ├── k8s/          # Kubernetes deployments, services, ingress, HPA
-│   └── monitoring/   # Prometheus + Grafana dashboards
+├── infra/             # Infrastructure as Code (tanpa Docker)
+│   ├── terraform/     # AWS RDS MySQL, Redis, ALB, S3, CloudFront
+│   └── monitoring/    # Prometheus + Grafana dashboards
 │
 ├── docs/              # Technical documentation
 │   ├── API_SPEC.md
@@ -109,9 +107,9 @@ mountainconnect-app/
 | Layer | Technology |
 |-------|-----------|
 | **Mobile** | React Native 0.73+, TypeScript, Redux Toolkit, React Navigation 6, Mapbox GL |
-| **Backend** | NestJS 10, TypeORM, PostgreSQL, Redis (BullMQ), Socket.io |
+| **Backend** | NestJS 10, TypeORM, MySQL 8, Redis (BullMQ), Socket.io |
 | **Web** | Next.js 14, TypeScript, Tailwind CSS, TanStack Query, Zustand |
-| **Infra** | AWS (ECS, RDS, ElastiCache, S3, CloudFront), Kubernetes, Terraform |
+| **Infra** | AWS (RDS MySQL, ElastiCache, S3, CloudFront), Terraform, deploy native Node.js + PM2 |
 | **Monitoring** | Prometheus, Grafana, Firebase Crashlytics |
 
 ### External Integrations
@@ -125,16 +123,23 @@ mountainconnect-app/
 
 ## 🚀 Cara Menjalankan
 
+> **Tanpa Docker:** Proyek ini tidak memerlukan Docker, Docker Compose, atau container. Jalankan MySQL, Redis, dan Node.js **langsung di mesin Anda** (XAMPP/Laragon/MySQL Server + Redis for Windows, atau instalasi native di Linux).
+
 ### Prerequisites
 - Node.js 20+
-- Docker & Docker Compose
-- PostgreSQL 16+ (atau gunakan Docker)
-- Redis 7+ (atau gunakan Docker)
+- **MySQL 8+** (install lokal: XAMPP, Laragon, atau MySQL Server)
+- **Redis 7+** (install lokal atau Redis for Windows)
+
+### 0. Database MySQL
+Buat database sekali:
+```sql
+CREATE DATABASE mountainconnect CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
 ### 1. Backend (NestJS)
 ```bash
 cd backend
-cp .env.example .env  # Edit sesuai environment
+cp .env.example .env   # Sesuaikan DB_USERNAME, DB_PASSWORD
 npm install
 npm run start:dev
 # API tersedia di http://localhost:4000/api/v1
@@ -162,14 +167,25 @@ npm run dev
 # Dashboard tersedia di http://localhost:3000
 ```
 
-### 4. Docker Compose (All-in-One)
+### 4. Redis (jika belum jalan)
+Pastikan Redis aktif di `localhost:6379` sebelum menjalankan backend (untuk BullMQ).
+
+### 5. Production (opsional, tanpa Docker)
 ```bash
-docker-compose up -d
-# PostgreSQL: :5432
-# Redis: :6379
-# API: :4000
-# Dashboard: :3000
+cd backend && npm run build && pm2 start ecosystem.config.cjs --env production
+cd web-dashboard && npm run build && pm2 start ecosystem.config.cjs --env production
 ```
+Detail: [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md)
+
+---
+
+## 🚫 Kebijakan: Tidak Memakai Docker
+
+| Tidak dipakai | Digunakan sebagai gantinya |
+|---------------|---------------------------|
+| Docker / Docker Compose | `npm run dev` / `npm run start` |
+| AWS ECR / container images | Build artefak `dist/` + PM2 di VM/EC2 |
+| Kubernetes manifests | Dihapus — lihat `infra/k8s/README.md` |
 
 ---
 

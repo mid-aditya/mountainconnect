@@ -52,20 +52,3 @@ variable "allowed_ips" {
   default     = ["0.0.0.0/0"]
 }
 
-variable "ecs_task_cpu" {
-  description = "ECS task CPU units"
-  type        = number
-  default     = 1024
-}
-
-variable "ecs_task_memory" {
-  description = "ECS task memory in MB"
-  type        = number
-  default     = 2048
-}
-
-variable "ecs_desired_count" {
-  description = "Desired number of ECS tasks"
-  type        = number
-  default     = 2
-}

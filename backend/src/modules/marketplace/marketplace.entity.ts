@@ -43,7 +43,7 @@ export class MarketplaceItem extends BaseEntity {
   @Column({ name: 'category_id', nullable: true })
   categoryId: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   images: string[];
 
   @Column({ nullable: true })

@@ -43,7 +43,7 @@ export class SOSEvent extends BaseEntity {
   @Column({ name: 'resolved_at', type: 'timestamp with time zone', nullable: true })
   resolvedAt: Date;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   notifiedContacts: Array<{ name: string; phone: string; notifiedAt: string }>;
 
   @Column({ name: 'notified_authorities', default: false })

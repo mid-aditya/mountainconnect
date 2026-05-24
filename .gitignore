@@ -1,4 +1,6 @@
+# Project policy: no Docker (no Dockerfile / docker-compose in repo)
 node_modules/
+logs/
 dist/
 build/
 .next/

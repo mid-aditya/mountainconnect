@@ -38,21 +38,6 @@ output "cloudfront_domain" {
   value       = aws_cloudfront_distribution.main.domain_name
 }
 
-output "ecr_api_repository_url" {
-  description = "ECR repository URL for API service"
-  value       = aws_ecr_repository.api.repository_url
-}
-
-output "ecr_worker_repository_url" {
-  description = "ECR repository URL for worker service"
-  value       = aws_ecr_repository.worker.repository_url
-}
-
-output "ecr_dashboard_repository_url" {
-  description = "ECR repository URL for dashboard"
-  value       = aws_ecr_repository.dashboard.repository_url
-}
-
 output "vpc_id" {
   description = "VPC ID"
   value       = aws_vpc.main.id

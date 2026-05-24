@@ -56,19 +56,19 @@ export class User extends BaseEntity {
   @Index()
   verificationLevel: VerificationLevel;
 
-  @Column({ type: 'jsonb', default: ['solo_traveler'] })
+  @Column({ type: 'json' })
   roles: string[];
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   emergencyContact: EmergencyContact | null;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   medicalInfo: MedicalInfo | null;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   skills: string[];
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'json', nullable: true })
   badges: Badge[];
 
   @Column({ name: 'ktp_verified', default: false })
@@ -84,7 +84,7 @@ export class User extends BaseEntity {
   @Column({ name: 'last_login', type: 'timestamp with time zone', nullable: true })
   lastLogin: Date | null;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   deviceTokens: string[];
 
   @Column({ name: 'email_verified', default: false })

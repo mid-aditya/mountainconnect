@@ -30,7 +30,7 @@ export class Route extends BaseEntity {
   @Column({ type: 'int', nullable: true })
   elevationGain: number;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   waypoints: Array<{
     name: string;
     lat: number;

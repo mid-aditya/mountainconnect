@@ -46,10 +46,10 @@ export class Trip extends BaseEntity {
   @Column({ type: "int", default: 5 })
   difficulty: number;
 
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: "json", nullable: true })
   includes: any;
 
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: "json", nullable: true })
   itinerary: Array<{
     day: number;
     activities: string;

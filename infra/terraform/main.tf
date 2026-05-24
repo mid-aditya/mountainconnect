@@ -116,7 +116,7 @@ resource "aws_security_group" "api" {
   }
 }
 
-# RDS PostgreSQL
+# RDS MySQL
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-${var.environment}-db-subnet"
   subnet_ids = aws_subnet.private[*].id
@@ -127,8 +127,8 @@ resource "aws_db_subnet_group" "main" {
 
 resource "aws_db_instance" "main" {
   identifier             = "${var.project_name}-${var.environment}-db"
-  engine                 = "postgres"
-  engine_version         = "16.2"
+  engine                 = "mysql"
+  engine_version         = "8.0"
   instance_class         = var.db_instance_class
   allocated_storage      = 100
   storage_type           = "gp3"
@@ -330,37 +330,6 @@ resource "aws_acm_certificate" "main" {
   validation_method         = "DNS"
   provider                  = aws.us_east_1
 
-  tags = { Project = var.project_name }
-}
-
-# ECR Repositories
-resource "aws_ecr_repository" "api" {
-  name                 = "${var.project_name}-api"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = var.environment != "production"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  tags = { Project = var.project_name }
-}
-
-resource "aws_ecr_repository" "worker" {
-  name                 = "${var.project_name}-worker"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = var.environment != "production"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  tags = { Project = var.project_name }
-}
-
-resource "aws_ecr_repository" "dashboard" {
-  name                 = "${var.project_name}-dashboard"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = var.environment != "production"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
   tags = { Project = var.project_name }
 }
 

@@ -38,7 +38,7 @@ export class Mountain extends BaseEntity {
   @Column({ nullable: true })
   imageUrl: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   permits: {
     required: boolean;
     prices?: { local: number; foreign: number };
@@ -48,7 +48,7 @@ export class Mountain extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   rules: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   weatherInfo: {
     avgTemp?: number;
     rainyDays?: number;

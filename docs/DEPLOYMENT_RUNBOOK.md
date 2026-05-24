@@ -1,293 +1,165 @@
 # Deployment Runbook - MountainConnect ID
 
+> **Kebijakan:** Proyek ini **tidak memakai Docker**, Docker Compose, ECR, ECS, atau Kubernetes container. Deploy memakai **Node.js native** (build + PM2 atau systemd) di VM/EC2.
+
 ## Pre-requisites
 
-- [ ] AWS CLI configured with appropriate IAM credentials
-- [ ] kubectl configured for EKS cluster
-- [ ] Docker installed for local builds
-- [ ] Helm 3.x installed
-- [ ] Terraform >= 1.5 installed
-- [ ] Access to ECR repositories (push access)
-- [ ] Domain configured in Route53
-- [ ] SSL certificates provisioned via ACM
+- [ ] Node.js 20+ terpasang di server
+- [ ] MySQL 8+ (RDS atau server lokal)
+- [ ] Redis 7+ (ElastiCache atau server lokal)
+- [ ] PM2 (`npm install -g pm2`) — direkomendasikan
+- [ ] (Production AWS) Terraform >= 1.5, AWS CLI — hanya untuk RDS/Redis/ALB, bukan container
 
 ## Environment Setup
 
-### Variables
-
 ```bash
-# Environment
-export ENVIRONMENT=staging  # or production
-export REGION=ap-southeast-1
+export ENVIRONMENT=staging   # atau production
 export PROJECT_NAME=mountainconnect
-
-# Docker
-export ECR_REPO_API=${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${PROJECT_NAME}-api
-export ECR_REPO_WORKER=${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${PROJECT_NAME}-worker
-export ECR_REPO_DASHBOARD=${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${PROJECT_NAME}-dashboard
-
-# Kubernetes
-export CLUSTER_NAME=${PROJECT_NAME}-${ENVIRONMENT}
-export NAMESPACE=${PROJECT_NAME}
+export DEPLOY_PATH=/opt/mountainconnect
 ```
 
-## Database Migration
+Salin dan sesuaikan env:
+
+- `backend/.env` — dari `backend/.env.example`
+- `web-dashboard/.env.local` — `NEXT_PUBLIC_API_URL`, `NEXTAUTH_*`
+
+## Build Aplikasi
 
 ```bash
-# 1. Pull latest migration files
-git pull origin main
+# Backend API
+cd backend
+npm ci
+npm run build
 
-# 2. Run migrations (production requires maintenance window)
-kubectl exec -n ${NAMESPACE} deployment/api-primary -- \
-  npm run migrate:latest
-
-# 3. Verify migration status
-kubectl exec -n ${NAMESPACE} deployment/api-primary -- \
-  npm run migrate:status
-
-# 4. Rollback if needed
-kubectl exec -n ${NAMESPACE} deployment/api-primary -- \
-  npm run migrate:rollback -- --to=previous
+# Web dashboard
+cd ../web-dashboard
+npm ci
+npm run build
 ```
 
-## Docker Image Build & Push
+## Deploy ke Server (PM2)
+
+### 1. Salin kode ke server
 
 ```bash
-# 1. Authenticate to ECR
-aws ecr get-login-password --region ${REGION} | \
-  docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
-
-# 2. Build API image
-docker build -t ${ECR_REPO_API}:${GIT_SHA} \
-  --build-arg GIT_SHA=${GIT_SHA} \
-  --build-arg NODE_ENV=production \
-  -f Dockerfile.api .
-
-# 3. Build Worker image
-docker build -t ${ECR_REPO_WORKER}:${GIT_SHA} \
-  --build-arg NODE_ENV=production \
-  -f Dockerfile.worker .
-
-# 4. Build Dashboard image
-docker build -t ${ECR_REPO_DASHBOARD}:${GIT_SHA} \
-  --build-arg NODE_ENV=production \
-  -f Dockerfile.dashboard .
-
-# 5. Push to ECR
-docker push ${ECR_REPO_API}:${GIT_SHA}
-docker push ${ECR_REPO_WORKER}:${GIT_SHA}
-docker push ${ECR_REPO_DASHBOARD}:${GIT_SHA}
-
-# 6. Tag as latest
-docker tag ${ECR_REPO_API}:${GIT_SHA} ${ECR_REPO_API}:latest
-docker push ${ECR_REPO_API}:latest
+rsync -av --exclude node_modules ./ ${DEPLOY_PATH}/
+# atau git pull di server setelah clone repo
 ```
 
-## Service Deployment
-
-### Rolling Update (Zero Downtime)
+### 2. Install dependensi & build (di server)
 
 ```bash
-# 1. Update image tag in deployment
-kubectl set image deployment/api-primary \
-  api=${ECR_REPO_API}:${GIT_SHA} \
-  -n ${NAMESPACE}
-
-# 2. Monitor rollout
-kubectl rollout status deployment/api-primary -n ${NAMESPACE} --timeout=300s
-
-# 3. Update worker
-kubectl set image deployment/worker \
-  worker=${ECR_REPO_WORKER}:${GIT_SHA} \
-  -n ${NAMESPACE}
-
-kubectl rollout status deployment/worker -n ${NAMESPACE} --timeout=300s
-
-# 4. Update dashboard
-kubectl set image deployment/dashboard \
-  dashboard=${ECR_REPO_DASHBOARD}:${GIT_SHA} \
-  -n ${NAMESPACE}
-
-kubectl rollout status deployment/dashboard -n ${NAMESPACE} --timeout=300s
+cd ${DEPLOY_PATH}/backend && npm ci --omit=dev && npm run build
+cd ${DEPLOY_PATH}/web-dashboard && npm ci && npm run build
 ```
 
-### Helm Deployment
+### 3. Jalankan dengan PM2
 
 ```bash
-# Update helm values
-helm upgrade --install ${PROJECT_NAME}-api ./charts/api \
-  --namespace ${NAMESPACE} \
-  --set image.tag=${GIT_SHA} \
-  --set environment=${ENVIRONMENT} \
-  --atomic \
-  --timeout 5m
+cd ${DEPLOY_PATH}/backend
+pm2 start ecosystem.config.cjs --env production
 
-helm upgrade --install ${PROJECT_NAME}-worker ./charts/worker \
-  --namespace ${NAMESPACE} \
-  --set image.tag=${GIT_SHA} \
-  --set environment=${ENVIRONMENT} \
-  --atomic \
-  --timeout 5m
+cd ${DEPLOY_PATH}/web-dashboard
+pm2 start ecosystem.config.cjs --env production
+
+pm2 save
+pm2 startup   # ikuti instruksi agar auto-start saat reboot
 ```
 
-## Health Check Endpoints
+### 4. Update rilis (zero-downtime ringan)
+
+```bash
+git pull
+cd backend && npm ci --omit=dev && npm run build && pm2 reload mountainconnect-api
+cd ../web-dashboard && npm ci && npm run build && pm2 reload mountainconnect-dashboard
+```
+
+## Deploy alternatif: systemd
+
+Contoh unit API (`/etc/systemd/system/mountainconnect-api.service`):
+
+```ini
+[Unit]
+Description=MountainConnect API
+After=network.target mysql.service redis.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/mountainconnect/backend
+EnvironmentFile=/opt/mountainconnect/backend/.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now mountainconnect-api
+```
+
+Ulangi pola serupa untuk dashboard: `npm run start` di folder `web-dashboard` setelah `npm run build`.
+
+## Health Check
 
 | Service | Endpoint | Expected |
 |---------|----------|----------|
-| API | `GET /health` | `200 OK` + `{status: "ok"}` |
-| API | `GET /health/ready` | `200 OK` + `{status: "ready", db: true, redis: true}` |
-| API | `GET /metrics` | Prometheus metrics |
-| Dashboard | `GET /api/health` | `200 OK` |
+| API | `GET http://localhost:4000/api/v1` (Swagger) | 200 |
+| API | `GET /health` *(jika endpoint ditambahkan)* | 200 |
+| Dashboard | `GET http://localhost:3000` | 200 |
 
 ```bash
-# Verify API health
-curl https://api.${PROJECT_NAME}.id/health
-
-# Verify dashboard health
-curl https://dashboard.${PROJECT_NAME}.id/api/health
-
-# Check pod status
-kubectl get pods -n ${NAMESPACE} -l app=api
+curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/api/docs
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
 ```
 
-## Monitoring Setup
+## Database (MySQL)
 
-### Prometheus
+Development: TypeORM `synchronize: true` membuat schema otomatis.
 
-Scrape endpoints are automatically configured via service monitors. Verify:
+Production: gunakan migrasi TypeORM (setelah folder `migrations/` ditambahkan) atau backup manual sebelum deploy.
 
 ```bash
-# Check Prometheus targets
-kubectl exec -n monitoring deployment/prometheus -- \
-  promtool query targets
-
-# Verify metrics are being collected
-kubectl exec -n monitoring deployment/prometheus -- \
-  promtool query instant \
-  --prometheus-url=http://prometheus:9090 \
-  'up{job="mountainconnect-api"}'
+# Backup manual
+mysqldump -u root -p mountainconnect > backup-$(date +%Y%m%d).sql
 ```
 
-### Grafana
+### RDS (AWS)
 
-Access at: `https://grafana.${PROJECT_NAME}.id`
-
-Default dashboards:
-- MountainConnect - API Overview
-- MountainConnect - SOS Real-time
-- MountainConnect - Business Metrics
-
-## Backup Strategy
-
-### PostgreSQL (RDS)
-
-- **Automated backups**: Daily at 02:00 UTC, retention 35 days
-- **Manual snapshots**: Before major deployments
-- **Point-in-time recovery**: Available within retention window
+- Automated backups harian
+- Snapshot manual sebelum rilis besar
 
 ```bash
-# Create manual snapshot
 aws rds create-db-snapshot \
   --db-instance-identifier ${PROJECT_NAME}-${ENVIRONMENT} \
   --db-snapshot-identifier ${PROJECT_NAME}-pre-deploy-$(date +%Y%m%d-%H%M)
 ```
 
-### Redis (ElastiCache)
+## Redis
 
-- **Automatic backups**: Daily at 03:00 UTC, retention 7 days
-- **Cluster mode**: Enabled for production
+Pastikan `REDIS_HOST` / `REDIS_PORT` di `backend/.env` mengarah ke instance Redis yang aktif (wajib untuk BullMQ).
 
-### S3 Assets
+## Monitoring
 
-- **Versioning**: Enabled
-- **Lifecycle**: Move to IA after 90 days, Glacier after 1 year
-- **Cross-region replication**: Enabled for disaster recovery
+- `infra/monitoring/prometheus.yml` — scrape target arahkan ke host:port API (bukan container)
+- Grafana: dashboard di `infra/monitoring/grafana-dashboard.json`
 
-## Rollback Procedure
-
-### Application Rollback
+## Rollback
 
 ```bash
-# 1. Get previous successful deployment
-kubectl rollout history deployment/api-primary -n ${NAMESPACE}
-
-# 2. Rollback to previous version
-kubectl rollout undo deployment/api-primary -n ${NAMESPACE}
-
-# 3. Verify rollback
-kubectl rollout status deployment/api-primary -n ${NAMESPACE}
+git checkout <commit-sebelumnya>
+cd backend && npm ci --omit=dev && npm run build && pm2 reload mountainconnect-api
+cd ../web-dashboard && npm ci && npm run build && pm2 reload mountainconnect-dashboard
 ```
 
-### Database Rollback
-
-```bash
-# 1. STOP - Do not proceed if data is critical
-# 2. Create snapshot of current state
-aws rds create-db-snapshot \
-  --db-instance-identifier ${PROJECT_NAME}-${ENVIRONMENT} \
-  --db-snapshot-identifier ${PROJECT_NAME}-pre-rollback-$(date +%Y%m%d)
-
-# 3. Restore from previous backup (creates new instance)
-aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier ${PROJECT_NAME}-${ENVIRONMENT}-restored \
-  --db-snapshot-identifier ${PROJECT_NAME}-backup-YYYY-MM-DD-HH-MM
-
-# 4. Update connection string in Secrets Manager
-# 5. Deploy restored instance
-```
-
-## Scaling Guide
-
-### Horizontal Scaling (Pods)
-
-```bash
-# Manual scale
-kubectl scale deployment/api-primary --replicas=5 -n ${NAMESPACE}
-
-# Or use HPA
-kubectl autoscale deployment/api-primary \
-  --min=2 \
-  --max=10 \
-  --cpu-percent=70 \
-  -n ${NAMESPACE}
-```
-
-### Vertical Scaling (Resources)
-
-Update resource requests/limits in values file and redeploy.
-
-### Database Scaling
-
-- **Read replicas**: For read-heavy workloads
-- **Vertical scaling**: Change instance class (requires downtime)
-- **Connection pooling**: PgBouncer for connection management
-
-## Alert Response
-
-| Alert | Severity | Action |
-|-------|----------|--------|
-| API latency > 2s | P2 | Check pods, scale if needed |
-| API error rate > 1% | P1 | Rollback to previous version |
-| Service down | P1 | Immediate rollback, page on-call |
-| Disk usage > 80% | P2 | Clean up logs, scale storage |
-| SOS queue > 100 | P1 | Scale worker, check worker health |
-| DB connections > 80% | P2 | Review connection pooling |
-
-## Emergency Contacts
-
-| Role | Contact |
-|------|---------|
-| DevOps Lead | [on-call rotation] |
-| Security | security@mountainconnect.id |
-| DPO | dpo@mountainconnect.id |
-| AWS Support | Enterprise Support |
+Restore database dari dump jika migrasi schema gagal.
 
 ## Post-Deployment Checklist
 
-- [ ] Verify health checks pass
-- [ ] Check error rates in Grafana
-- [ ] Verify critical user flows (login, booking, SOS)
-- [ ] Confirm backup completed
-- [ ] Update deployment log
-- [ ] Notify stakeholders (Slack #deployments)
-- [ ] Monitor for 30 minutes post-deploy
+- [ ] API & dashboard merespons health check
+- [ ] Login admin dashboard berhasil
+- [ ] Redis terhubung (tidak ada error BullMQ di log)
+- [ ] Backup database terjadwal
+- [ ] `pm2 status` semua proses `online`

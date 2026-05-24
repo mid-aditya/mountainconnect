@@ -31,7 +31,7 @@ export class Notification {
   @Column({ type: "text", nullable: true })
   body: string;
 
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ type: "json", nullable: true })
   data: Record<string, any>;
 
   @Column({ name: "is_read", default: false })
