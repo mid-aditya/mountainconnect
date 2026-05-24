@@ -64,9 +64,9 @@ async function verifyCredentials(email: string, password: string) {
 
     return {
       id: user.id,
-      email: user.email,
-      name: user.fullName,
-      image: user.avatar,
+      email: user.email ?? email,
+      name: user.fullName ?? "User",
+      image: user.avatar ?? null,
       accessToken,
       roles,
       role: mapRolesToDashboardRole(roles),
@@ -116,7 +116,20 @@ const providers: AuthOptions["providers"] = [
     },
     async authorize(credentials) {
       if (!credentials?.email || !credentials?.password) return null;
-      return verifyCredentials(credentials.email, credentials.password);
+      const account = await verifyCredentials(
+        credentials.email,
+        credentials.password,
+      );
+      if (!account) return null;
+      return {
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        image: account.image ?? undefined,
+        accessToken: account.accessToken,
+        roles: account.roles,
+        role: account.role,
+      } as any;
     },
   }),
 ];
@@ -149,9 +162,14 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user, account }) {
       if (user) {
-        token.accessToken = (user as { accessToken?: string }).accessToken;
-        token.roles = (user as { roles?: string[] }).roles;
-        token.role = (user as { role?: string }).role;
+        const u = user as {
+          accessToken?: string;
+          roles?: string[];
+          role?: string;
+        };
+        if (u.accessToken) token.accessToken = u.accessToken;
+        if (u.roles) token.roles = u.roles;
+        if (u.role) token.role = u.role;
       }
 
       if (account?.provider === "google" || account?.provider === "github") {

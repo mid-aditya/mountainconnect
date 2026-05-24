@@ -18,8 +18,9 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, isEndUser } = useAuth();
   const router = useRouter();
+  const settingsHref = isEndUser() ? '/user/settings' : '/dashboard/settings';
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -144,7 +145,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </div>
                 <div className="p-1">
                   <Link
-                    href="/dashboard/settings"
+                    href={settingsHref}
                     onClick={() => setShowUserMenu(false)}
                     className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg"
                   >

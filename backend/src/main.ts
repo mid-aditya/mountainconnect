@@ -2,7 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
-import { seedDefaultAdmin } from "./bootstrap/seed-admin";
+import { seedDefaultUsers } from "./bootstrap/seed-users";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -38,7 +38,7 @@ async function bootstrap() {
 
   if (process.env.NODE_ENV !== "production") {
     try {
-      await seedDefaultAdmin(app);
+      await seedDefaultUsers(app);
     } catch (err) {
       console.warn("Admin seed skipped:", err);
     }

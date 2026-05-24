@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/router";
+import { getPostLoginPath } from "@/lib/auth-routes";
+import { SEED_ACCOUNTS } from "@/lib/seed-accounts";
 import Head from "next/head";
 import {
   EnvelopeIcon,
@@ -34,8 +36,9 @@ export default function LandingPage() {
   });
 
   useEffect(() => {
-    if (status === "authenticated" && session) {
-      router.replace("/dashboard");
+    if (status === "authenticated" && session?.user) {
+      const u = session.user as { roles?: string[]; role?: string };
+      router.replace(getPostLoginPath(u.roles, u.role));
     }
   }, [status, session, router]);
 
@@ -64,11 +67,13 @@ export default function LandingPage() {
 
     if (result?.error) {
       setError(
-        "Login gagal. Pastikan backend berjalan di http://localhost:4000, lalu gunakan admin@mountainconnect.id / Admin123!",
+        "Login gagal. Pastikan backend jalan di :4000 dan kredensial benar (lihat daftar akun demo di bawah).",
       );
       setLoading(false);
     } else {
-      router.push("/dashboard");
+      const fresh = await getSession();
+      const u = fresh?.user as { roles?: string[]; role?: string } | undefined;
+      router.push(getPostLoginPath(u?.roles, u?.role));
     }
   };
 
@@ -83,7 +88,7 @@ export default function LandingPage() {
   return (
     <>
       <Head>
-        <title>MountainConnect ID - Admin Login</title>
+        <title>MountainConnect ID - Login</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
@@ -107,12 +112,30 @@ export default function LandingPage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 Welcome Back
               </h1>
-              <p className="text-gray-500 mb-2">
-                Sign in to your admin dashboard
+              <p className="text-gray-500 mb-4">
+                Masuk sebagai admin, operator, atau pendaki
               </p>
-              <p className="text-xs text-gray-400 mb-8">
-                Dev: admin@mountainconnect.id / Admin123! (dibuat otomatis saat backend start)
-              </p>
+              <div className="mb-8 p-4 rounded-xl bg-gray-50 border border-gray-100 space-y-2 text-xs text-gray-600">
+                <p className="font-semibold text-gray-800">Akun demo (backend dev):</p>
+                {Object.values(SEED_ACCOUNTS).map((acc) => (
+                  <p key={acc.email}>
+                    <span className="font-medium text-primary-700">{acc.label}</span>
+                    {" — "}
+                    <button
+                      type="button"
+                      className="text-primary-600 hover:underline"
+                      onClick={() => {
+                        setEmail(acc.email);
+                        setPassword(acc.password);
+                      }}
+                    >
+                      {acc.email}
+                    </button>
+                    {" / "}
+                    {acc.password}
+                  </p>
+                ))}
+              </div>
 
               {error && (
                 <div className="mb-4 p-3 bg-danger-50 text-danger-600 rounded-lg text-sm">

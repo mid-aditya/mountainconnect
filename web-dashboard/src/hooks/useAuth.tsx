@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { getPostLoginPath, normalizeRole } from '@/lib/auth-routes';
 
 type UserRole = 'admin' | 'operator' | 'tn_admin' | 'moderator' | 'user';
 
@@ -44,15 +45,22 @@ export function useAuth() {
 
   const userRoles = (): string[] => {
     if (!user) return [];
-    if (user.roles?.length) return user.roles;
-    if (user.role) return [user.role];
-    return [];
+    const raw = user.roles?.length ? user.roles : user.role ? [user.role] : [];
+    return raw.map(normalizeRole);
   };
 
   const hasRole = (...roles: UserRole[]): boolean => {
     const current = userRoles();
     return roles.some((r) => current.includes(r));
   };
+
+  const isEndUser = (): boolean => {
+    const current = userRoles();
+    return current.includes('user') && !isAdmin() && !isOperator() && !isTnAdmin() && !isModerator();
+  };
+
+  const homePath = (): string =>
+    getPostLoginPath(user?.roles, user?.role);
 
   const hasPermission = (...permissions: string[]): boolean => {
     if (!user?.permissions?.length) return false;
@@ -76,6 +84,8 @@ export function useAuth() {
     isOperator,
     isTnAdmin,
     isModerator,
+    isEndUser,
+    homePath,
     updateSession: update,
   };
 }

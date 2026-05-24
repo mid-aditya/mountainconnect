@@ -1,5 +1,6 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
+import UserSidebar from './UserSidebar';
 import Header from './Header';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/router';
@@ -10,8 +11,20 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isEndUser } = useAuth();
   const router = useRouter();
+  const isUserPortal = router.pathname.startsWith('/user');
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+    if (isEndUser() && router.pathname.startsWith('/dashboard')) {
+      router.replace('/user');
+      return;
+    }
+    if (!isEndUser() && isUserPortal) {
+      router.replace('/dashboard');
+    }
+  }, [isLoading, isAuthenticated, isEndUser, isUserPortal, router]);
 
   if (isLoading) {
     return (
@@ -27,6 +40,7 @@ export default function Layout({ children }: LayoutProps) {
 
   // Only show sidebar layout for dashboard routes
   if (!router.pathname.startsWith('/dashboard') &&
+      !router.pathname.startsWith('/user') &&
       !router.pathname.startsWith('/operator-portal') &&
       !router.pathname.startsWith('/tn-admin-portal') &&
       !router.pathname.startsWith('/moderation-tools')) {
@@ -44,7 +58,11 @@ export default function Layout({ children }: LayoutProps) {
       )}
 
       {/* Sidebar */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {isUserPortal ? (
+        <UserSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      ) : (
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
